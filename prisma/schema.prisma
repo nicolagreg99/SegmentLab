@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+
+  activities Activity[]
+  efforts    SegmentEffort[]
+  segments   Segment[]
+}
+
+model Activity {
+  id                  String   @id @default(cuid())
+  userId              String
+  name                String
+  date                DateTime
+  distanceMeters      Float
+  elevationGainMeters Float
+  durationSeconds     Int
+  gpxRaw              String   // file GPX originale
+  createdAt           DateTime @default(now())
+
+  user     User            @relation(fields: [userId], references: [id])
+  efforts  SegmentEffort[]
+}
+
+model Segment {
+  id                  String      @id @default(cuid())
+  userId              String                          // ← aggiunto
+  name                String
+  type                SegmentType @default(CLIMB)
+  distanceMeters      Float
+  elevationGainMeters Float
+  avgGradientPercent  Float
+  maxGradientPercent  Float
+  startLat            Float
+  startLng            Float
+  endLat              Float
+  endLng              Float
+  pointsJson          String
+  createdAt           DateTime    @default(now())
+
+  user    User            @relation(fields: [userId], references: [id])
+  efforts SegmentEffort[]
+
+  @@unique([userId, startLat, startLng, endLat, endLng])
+}
+
+model SegmentEffort {
+  id               String   @id @default(cuid())
+  segmentId        String
+  activityId       String
+  userId           String
+  durationSeconds  Int
+  avgSpeedKmh      Float
+  date             DateTime
+  isPersonalRecord Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  segment  Segment  @relation(fields: [segmentId], references: [id])
+  activity Activity @relation(fields: [activityId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+enum SegmentType {
+  CLIMB
+  CUSTOM
+}
