@@ -1,7 +1,7 @@
 'use server'
 
 import { db }                                    from '@/db/client'
-import { signIn, signOut }                       from '@/lib/auth/config'
+import { signIn, signOut, auth }                from '@/lib/auth/config'
 import { AuthError }                             from 'next-auth'
 import { redirect }                              from 'next/navigation'
 import { headers }                               from 'next/headers'
@@ -36,16 +36,13 @@ export async function register(prevState: any, formData: FormData) {
   if (policyError) return { error: policyError }
 
   const existing = await db.user.findUnique({ where: { email } })
-
-  // Se l'email esiste già rispondiamo comunque con successo per non
-  // rivelare quali indirizzi sono già registrati
   if (existing) return { success: true }
 
   const passwordHash       = await hashPassword(password)
   const verificationToken  = generateToken()
   const verificationExpiry = tokenExpiry(24)
 
-  await db.user.create({
+  const user = await db.user.create({
     data: {
       email,
       name,
@@ -58,6 +55,40 @@ export async function register(prevState: any, formData: FormData) {
   })
 
   await sendVerificationEmail(email, verificationToken)
+
+  // Passiamo l'id al client per il secondo step
+  return { success: true, userId: user.id }
+}
+
+export async function saveProfile(prevState: any, formData: FormData) {
+  const userId = String(formData.get('userId') ?? '')
+  if (!userId) return { error: 'Utente non trovato' }
+
+  const birthYear = formData.get('birthYear')
+  const weight    = formData.get('weight')
+  const height    = formData.get('height')
+
+  const profile = {
+    // Dati fisici
+    gender:    formData.get('gender')    || null,
+    birthYear: birthYear ? parseInt(String(birthYear)) : null,
+    weightKg:  weight    ? parseFloat(String(weight))  : null,
+    heightCm:  height    ? parseFloat(String(height))  : null,
+
+    // Attrezzatura
+    bikeType:  formData.get('bikeType')  || null,
+    bikeCount: formData.get('bikeCount') ? parseInt(String(formData.get('bikeCount'))) : null,
+    bikeBrand: formData.get('bikeBrand') || null,
+
+    // Zona geografica
+    city:      formData.get('city')      || null,
+    region:    formData.get('region')    || null,
+  }
+
+  await db.user.update({
+    where: { id: userId },
+    data:  { profile },
+  })
 
   return { success: true }
 }
@@ -258,4 +289,61 @@ export async function resetPassword(prevState: any, formData: FormData) {
   })
 
   redirect('/login?reset=1')
+}
+
+// ── Aggiornamento profilo ─────────────────────────────────────────────────────
+
+const profileSchema = z.object({
+  name:      z.string().min(2, 'Nome troppo corto').max(50).optional(),
+  gender:    z.enum(['male', 'female', 'other']).nullable().optional(),
+  birthYear: z.coerce.number().int().min(1930).max(new Date().getFullYear() - 10).nullable().optional(),
+  weightKg:  z.coerce.number().min(30).max(300).nullable().optional(),
+  heightCm:  z.coerce.number().min(100).max(250).nullable().optional(),
+  bikeType:  z.string().max(50).nullable().optional(),
+  bikeCount: z.coerce.number().int().min(1).max(20).nullable().optional(),
+  bikeBrand: z.string().max(50).nullable().optional(),
+  city:      z.string().max(100).nullable().optional(),
+  region:    z.string().max(100).nullable().optional(),
+})
+
+export async function updateProfile(prevState: any, formData: FormData) {
+  const session = await auth()
+  if (!session?.user?.id) redirect('/login')
+
+  const raw = {
+    name:      formData.get('name')      || undefined,
+    gender:    formData.get('gender')    || null,
+    birthYear: formData.get('birthYear') || null,
+    weightKg:  formData.get('weightKg')  || null,
+    heightCm:  formData.get('heightCm')  || null,
+    bikeType:  formData.get('bikeType')  || null,
+    bikeCount: formData.get('bikeCount') || null,
+    bikeBrand: formData.get('bikeBrand') || null,
+    city:      formData.get('city')      || null,
+    region:    formData.get('region')    || null,
+  }
+
+  const parsed = profileSchema.safeParse(raw)
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0].message }
+  }
+
+  const { name, ...profileFields } = parsed.data
+
+  const user = await db.user.findUnique({
+    where:  { id: session.user.id },
+    select: { profile: true },
+  })
+
+  const existingProfile = (user?.profile ?? {}) as Record<string, unknown>
+
+  await db.user.update({
+    where: { id: session.user.id },
+    data:  {
+      ...(name ? { name } : {}),
+      profile: { ...existingProfile, ...profileFields },
+    },
+  })
+
+  return { success: true }
 }

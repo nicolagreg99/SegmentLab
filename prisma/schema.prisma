@@ -12,12 +12,13 @@ model User {
   email               String    @unique
   name                String?
   passwordHash        String?
-  provider            String    @default("credentials")  // "credentials" | "zitadel" | "google"
+  provider            String    @default("credentials")
   emailVerified       Boolean   @default(false)
   verificationToken   String?   @unique
   verificationExpiry  DateTime?
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
+  profile             Json?     // dati aggiuntivi dell'utente
   createdAt           DateTime  @default(now())
 
   activities Activity[]
