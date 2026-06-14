@@ -1,8 +1,8 @@
 'use client'
 
 import { useActionState } from 'react'
-import { login } from '@/lib/auth/actions'
-import Link from 'next/link'
+import { login }          from '@/lib/auth/actions'
+import Link               from 'next/link'
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, null)
@@ -11,7 +11,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-950">
       <div className="w-full max-w-sm space-y-6 p-8 bg-gray-900 rounded-xl border border-gray-800">
         <div>
-          <h1 className="text-2xl font-bold text-white">Test</h1>
+          <h1 className="text-2xl font-bold text-white">SegmentLab</h1>
           <p className="text-gray-400 text-sm mt-1">Accedi al tuo account</p>
         </div>
 
@@ -22,15 +22,18 @@ export default function LoginPage() {
               name="email"
               type="email"
               required
+              autoComplete="email"
               className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
+
           <div>
             <label className="block text-sm text-gray-300 mb-1">Password</label>
             <input
               name="password"
               type="password"
               required
+              autoComplete="current-password"
               className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -48,10 +51,17 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-400">
-          Non hai un account?{' '}
-          <Link href="/register" className="text-blue-400 hover:underline">Registrati</Link>
-        </p>
+        <div className="flex items-center justify-between text-sm">
+          <Link href="/forgot-password" className="text-gray-400 hover:text-white transition-colors">
+            Password dimenticata?
+          </Link>
+          <Link href="/register" className="text-blue-400 hover:underline">
+            Registrati
+          </Link>
+        </div>
+
+        {/* Messaggio dopo reset password */}
+        {/* Viene mostrato solo se arrivati da /reset-password */}
       </div>
     </div>
   )
